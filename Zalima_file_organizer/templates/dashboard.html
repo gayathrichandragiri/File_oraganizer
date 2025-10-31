@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart File Organizer - Dashboard</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: 'Poppins', sans-serif;
+    }
+    .card {
+      background-color: #1e293b;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .btn {
+      background-color: #3b82f6;
+      color: white;
+      font-weight: 600;
+      border-radius: 8px;
+      padding: 8px 14px;
+      transition: 0.2s;
+    }
+    .btn:hover {
+      background-color: #2563eb;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Navbar -->
+  <nav class="bg-slate-900 text-white py-3 px-8 flex justify-between items-center">
+    <h1 class="text-xl font-bold">Smart Organizer</h1>
+    <div class="space-x-6">
+      <a href="/dashboard" class="hover:text-blue-400">Dashboard</a>
+      <a href="/records" class="hover:text-blue-400">Records</a>
+      <a href="/" class="hover:text-blue-400">Home</a>
+    </div>
+  </nav>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="m-4">
+      {% for message in messages %}
+      <div class="bg-green-600 text-white px-4 py-2 rounded-lg mb-2">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% endwith %}
+
+  <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- Upload Files -->
+    <div class="card">
+      <h2 class="text-lg font-semibold mb-3">Upload Files</h2>
+      <form action="/upload" method="post" enctype="multipart/form-data" class="flex flex-col gap-3">
+        <input type="file" name="files" multiple required class="bg-slate-800 p-2 rounded-lg" />
+        <button type="submit" class="btn w-32">Upload</button>
+      </form>
+    </div>
+
+    <!-- Organize Locally -->
+    <div class="card">
+      <h2 class="text-lg font-semibold mb-3">Organize Local Folder</h2>
+      <form id="organizeForm" class="flex flex-col gap-3">
+        <input type="text" name="local_path" id="local_path" placeholder="Enter absolute folder path (e.g. D:/test)"
+               class="bg-slate-800 p-2 rounded-lg text-white" />
+        <button type="button" id="organizeBtn" class="btn w-32">Organize</button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Charts Section -->
+  <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="card">
+      <h3 class="text-lg font-semibold mb-3">Files by Type</h3>
+      <canvas id="typeChart"></canvas>
+    </div>
+
+    <div class="card">
+      <h3 class="text-lg font-semibold mb-3">Activity Over Time</h3>
+      <canvas id="activityChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center py-4 text-slate-400 text-sm">
+    © 2025 Smart File Organizer | Developed by Gayathri Chandragiri
+  </footer>
+
+  <script>
+    // Hide local path form on Render (cloud)
+    fetch(window.location.origin + "/api/summary")
+      .then(r => r.json())
+      .then(data => {
+        const isRender = window.location.hostname.includes("onrender");
+        if (isRender) {
+          document.getElementById("organizeForm").style.display = "none";
+        }
+      });
+
+    // Handle organize click
+    document.getElementById("organizeBtn").addEventListener("click", async () => {
+      const path = document.getElementById("local_path").value;
+      if (!path) {
+        alert("Please enter a folder path!");
+        return;
+      }
+
+      const res = await fetch("/organize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ local_path: path })
+      });
+      const data = await res.json();
+      alert('Organized ${data.moved || 0} files! Mode: ${data.mode}');
+      location.reload();
+    });
+
+    // Load Charts
+    async function loadCharts() {
+      const res1 = await fetch("/api/summary");
+      const summary = await res1.json();
+      const res2 = await fetch("/api/chartdata");
+      const chartdata = await res2.json();
+
+      const ctx1 = document.getElementById("typeChart");
+      new Chart(ctx1, {
+        type: "bar",
+        data: {
+          labels: Object.keys(summary),
+          datasets: [{
+            label: "Files",
+            data: Object.values(summary),
+            backgroundColor: "#3b82f6"
+          }]
+        },
+        options: {
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      const ctx2 = document.getElementById("activityChart");
+      new Chart(ctx2, {
+        type: "line",
+        data: {
+          labels: chartdata.labels,
+          datasets: [{
+            label: "Files Organized",
+            data: chartdata.counts,
+            borderColor: "#f59e0b",
+            fill: false,
+            tension: 0.3
+          }]
+        },
+        options: {
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    loadCharts();
+  </script>
+
+</body>
+</html>
